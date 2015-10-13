@@ -46,5 +46,5 @@ sudo pip install powerline-status
 
 效果图:
 
-![Alt text](./static/demo_vim.jpg)
+![image](https://github.com/rfyiamcool/python-vim/raw/master/static/demo_vim.jpg)
 
