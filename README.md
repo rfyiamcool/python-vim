@@ -4,7 +4,7 @@
 
 更多的介绍
 
-[http://xiaorui.cc/2015/10/13/%E5%BF%AB%E9%80%9F%E6%89%93%E9%80%A0python-vim%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83powerlinectags/](http://xiaorui.cc/2015/10/13/%E5%BF%AB%E9%80%9F%E6%89%93%E9%80%A0python-vim%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83powerlinectags/)
+[http://xiaorui.cc/2015/10/13/%E5%9C%A8centos%E4%B8%8B%E6%89%93%E9%80%A0%E5%9F%BA%E4%BA%8Epython%E7%9A%84vim%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/](http://xiaorui.cc/2015/10/13/%E5%9C%A8centos%E4%B8%8B%E6%89%93%E9%80%A0%E5%9F%BA%E4%BA%8Epython%E7%9A%84vim%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83/)
 
 python vim环境包的安装方法:
 
