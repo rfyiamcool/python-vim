@@ -1,0 +1,333 @@
+#encoding=utf-8
+#!/bin/python
+
+import os
+import sys
+import time
+import datetime
+import codecs
+import collections
+import logging  
+import signal
+
+logging.basicConfig(filename = os.path.join(os.getcwd(), 'migrate.log'),\
+    level = logging.INFO, filemode = 'a', format = '%(asctime)s - %(process)s - %(levelname)s:\
+    %(message)s') 
+
+from pyes import ES 
+from store import SQLStore 
+from compress import decompress
+
+mysql_addr = {
+    #'host' : '192.168.1.76',
+    'host' : '192.168.1.20',
+    'port' : 3306,
+    'user' : 'buzz',
+    'passwd' : 'f0b5e7',
+    'db' : 'buzz_master'
+    }
+sqlstore = SQLStore(**mysql_addr)
+
+def get_tasks_info(share_queue):
+    migrate = codecs.open('current_tasks.log', 'r', 'utf-8')
+    task_id = 1 
+    for line in migrate:
+        ls = line.strip().split('->')
+        start = datetime.datetime.strptime(ls[0], '%Y-%m-%d %H:%M:%S')
+        end = datetime.datetime.strptime(ls[1], '%Y-%m-%d %H:%M:%S')
+        task = (start, end, task_id)
+        share_queue.put(task)
+        task_id += 1
+    migrate.close()
+    pass
+
+def save_tasks_info(share_queue):
+    #file = 'current_tasks.log-' + str(datetime.datetime.now())
+    file = 'current_tasks.log'
+    migrate = codecs.open(file, 'w', 'utf-8')
+    while share_queue.qsize() != 0:
+        task = share_queue.get()
+        start = task[0]
+        end = task[1]
+        progress = str(start).decode('ascii') + '->' + str(end).decode('ascii')
+        #print type(progress), progress
+        migrate.write(progress + '\n')
+    migrate.close()
+    pass
+
+batch_num = 200
+
+### old es cluster
+#conn = ES('192.168.1.95:8200', timeout = 120, bulk_size = batch_num)
+
+### new es cluster
+#conn = ES('192.168.1.79:9200', timeout = 120, bulk_size = batch_num)
+conn = ES('192.168.1.88:9000', timeout = 120, bulk_size = batch_num)
+
+multi_key_num = 0
+total_doc_num = 0
+total_task_num = 0
+tongji_start = 0
+batch_tasks = {}
+
+def get_index_name(idate):
+    index_name = 'listening_v2_' + str(idate.year) + str(idate.month)
+    return index_name
+
+def write_es(new_record, start, end):
+    global batch_tasks
+    global total_doc_num
+    global batch_num
+    global tongji_start
+    try:
+        total_doc_num += 1
+        if not start in batch_tasks:
+            batch_tasks[start] = [start, end]
+        current_start = time.time()
+        index_name = get_index_name(new_record['idate'])
+        conn.index(new_record, index_name, 'buzz', new_record['id'], bulk = True)
+        if total_doc_num % batch_num == 0:
+            #conn.force_bulk()   ### no need, it will auto flush
+            cur_speed = batch_num / (time.time() - current_start)
+            avg_speed = total_doc_num / (time.time() - tongji_start)
+            logging.info('auto flushing one batch to index: %s over, total_doc_num: %d, cur speed: %f, avg speed: %f', 
+                index_name, total_doc_num, cur_speed, avg_speed)
+#        script = '''
+#            if (!ctx._source.keyword.contains(keyword)) {
+#                ctx._source.keyword += keyword;
+#            }
+#            old = ctx._source.distr_pan.find { it.k == emotion.k };
+#            if (old) { 
+#                old.v = emotion.v; 
+#            } else {
+#                ctx._source.distr_pan += emotion;
+#            }
+#            old = ctx._source.distr_brief.find { it.k == brief.k };
+#            if (old) { 
+#                old.v = brief.v; 
+#            } else {
+#                ctx._source.distr_brief += brief;
+#            }
+#            ctx._source.idate = new_record['idate']
+#            ctx._source.cdate = new_record['cdate']
+#            ctx._source.ccount =  new_record['ccount']
+#            ctx._source.flash = new_record['flash']
+#        '''
+#        params = {}
+#        params['keyword'] = keyword
+#        params['emotion'] = {'k': keyword, 'v': emotion}
+#        params['brief'] = {'k': keyword, 'v': brief}
+#        conn.update('listening', 'buzz', new_record['id'], script, lang = 'groovy', 
+#                params = params, document = None, upsert = new_record, model = None, bulk = True)
+    except Exception, e:
+        logging.error('error: %s, type: %s',str(e), str(type(e)))
+        ### logging error tasks in current batch
+        for k in batch_tasks:
+            logging.error('es error, task: %s->%s', str(batch_tasks[k][0]).decode('ascii'), 
+                    str(batch_tasks[k][1]).decode('ascii'))
+    finally:
+        if total_doc_num % batch_num == 0:
+            batch_tasks.clear()
+    pass
+
+from multiprocessing import Process, Queue
+is_running = True
+share_queue = Queue()
+
+def sig_handler(num, stack):
+    logging.info('receiving signal, exiting...')
+    global is_running
+    is_running = False
+
+def read_mysql(start, end, task_id):
+    cur_doc_num = 0
+    processed_url_md5 = set()
+    
+    table_name = "article"
+    sql = "select category_id, channel_name, url, title, author,\
+        comment_count, view_count, industry_id, created_on, url_md5, page_type, id\
+        from %s " % table_name + """ where created_on >= %s and created_on < %s and status = 0 order by created_on""" 
+    logging.info('begin read db: %s, task: %s->%s %d', table_name, str(start).decode('ascii'),
+            str(end).decode('ascii'), task_id) 
+    cursor = sqlstore.get_cursor()
+    cursor.execute(sql, (start, end))
+    
+    logging.info('end read db: %s, task: %s->%s %d', table_name, str(start).decode('ascii'),
+            str(end).decode('ascii'), task_id) 
+
+    for article in cursor.fetchall():
+        if is_running: 
+            ### step 1, get article and content 
+            article = list(article)
+            if len(article) != 12 :
+                continue
+            category_id = article[0]
+            channel_name = article[1] 
+            url = article[2]
+            title = article[3]
+            author = article[4]
+            comment_count = article[5]
+            view_count = article[6]
+            industry_id = article[7] 
+            created_on = article[8]
+            url_md5 = article[9]
+            page_type = article[10]
+            aid = article[11]   ### article_id
+            #print category_id, channel_name, url, title, author, comment_count, view_count, industry_id, created_on, url_md5, page_type
+            if url_md5 in processed_url_md5:
+                continue
+            else:
+                processed_url_md5.add(url_md5)
+            table_name = "article_content"
+            sql = "select content from %s " % table_name + """ where article_id = %s """
+            cursor.execute(sql, (aid, ))
+            article_content = cursor.fetchone()
+            if article_content is None:
+                continue
+            content, = article_content
+            content = title + unicode(decompress(content), 'utf-8')
+            
+            # build one new record
+            new_record = {}
+            new_record['id'] = u'buzz' + str(aid).decode('utf-8')
+            if category_id == 1 or category_id == 2 or category_id == 3:
+                category_id += 1     ### news, blog, bbs
+            elif category_id == 7:   ### weixin
+                category_id = 5
+            elif category_id == 5:   ### wenda
+                category_id = 6
+            else:
+                category_id = 2
+            new_record['platform'] = category_id
+            new_record['source'] = {'url': url, 'name': channel_name}
+            new_record['url'] = url
+            new_record['title'] = title
+            new_record['user'] = {'screen_name': author}
+            new_record['ccount'] = comment_count
+            new_record['flash'] = view_count
+            new_record['idate'] = created_on
+            new_record['text'] = content
+            
+            new_record['keyword'] = []   ### list
+            new_record['brief'] = []  ### list of dicts
+            new_record['distr_pan'] = [] ### list of dicts
+            
+            ### step 2, get all keywords info for this article 
+            table_name = "article_matched_keywords"
+            sql = "select article_id, pub_date, keyword, emotion, brief from %s " % table_name + \
+                    """ where article_id = %s and status=0 order by pub_date; """
+            cursor.execute(sql, (aid, ))
+            for line in cursor.fetchall():
+                line = list(line)
+                if len(line) != 5:
+                    logging.error('db error')
+                    continue
+                article_id = line[0]
+                pub_date = line[1]
+                keyword = line[2]
+                emotion = line[3]
+                brief = line[4]
+                #print article_id, keyword, emotion, pub_date 
+                new_record['cdate'] = pub_date   ### overwrite
+                new_record['keyword'].append(keyword)
+                new_record['brief'].append({'k': keyword, 'v': brief})
+                new_record['distr_pan'].append({'k': keyword, 'v': emotion})
+            #print new_record
+            write_es(new_record, start, end)
+            cur_doc_num += 1
+            global total_doc_num
+            global multi_key_num 
+            keys = ''
+            for k in new_record['keyword']:
+                keys += ' ' 
+                keys += k
+            logging.info('writing one new_record to es done, %s %d %d, %s total_task: %d task_doing: %d', 
+                    new_record['id'], cur_doc_num, total_doc_num, keys, total_task_num, task_id)
+            if len(new_record['keyword']) > 1:
+                multi_key_num += 1 
+                logging.info('article: %d has more than one keyword: %s, multi_key_num: %d', 
+                        aid, keys, multi_key_num)
+        else:
+            logging.info('ready to abort current task: start: %s, end: %s',
+                    str(start).decode('ascii'), str(end).decode('ascii'))
+            break
+    cursor.connection.commit() 
+    cursor.close() 
+    pass
+
+def worker(share_queue, control_queue):
+    logging.info('child: %d start, share_queue size: %d', 
+            os.getpid(), share_queue.qsize())
+    global tongji_start
+    tongji_start = time.time()
+    while share_queue.qsize() != 0:
+        global is_running
+        global total_doc_num
+        if is_running:
+            task = share_queue.get()
+            start = task[0]
+            end = task[1]
+            task_id = task[2]
+            done = False
+            while not done and is_running:
+                now =  datetime.datetime.now()
+                if now > end:
+                    logging.info('process task: %s->%s begin, total: %d, doing: %d',
+                        str(start).decode('ascii'), str(end).decode('ascii'), total_task_num,
+                        task_id) 
+                    read_mysql(start, end, task_id)
+                    speed = total_doc_num / (time.time() - tongji_start)
+                    logging.info('process task: %s->%s end, total: %d, done: %d, speed: %f',
+                        str(start).decode('ascii'), str(end).decode('ascii'), total_task_num,
+                        task_id, speed) 
+                    done = True
+                else:
+                    logging.info('child: %d will sleep 30 seconds for task: %s %s', os.getpid(),
+                        str(start).decode('ascii'), str(end).decode('ascii'))
+                    time.sleep(30)
+            if not is_running:
+                logging.info('append current task to queue head again, task: start: %s, end: %s', 
+                        str(start).decode('ascii'), str(end).decode('ascii'))
+                share_queue.put(task)
+        else:
+            break
+        pass 
+    logging.info("force flush es bulk to cluster")
+    conn.force_bulk()
+    logging.info("child: %d ready to exit, signal main process", os.getpid())
+    event = {'pid': os.getpid()}
+    control_queue.put(event)
+    pass
+
+
+if __name__ == '__main__':
+    signal.signal(signal.SIGINT, sig_handler)
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.siginterrupt(signal.SIGINT, False)
+    signal.siginterrupt(signal.SIGTERM, False)
+    logging.info('main process: %d start', os.getpid())
+    control_queue = Queue()
+    get_tasks_info(share_queue)
+    total_task_num = share_queue.qsize()
+    jobs = {} 
+    num = 3
+    for i in range(num):
+        p = Process(target = worker, args = (share_queue, control_queue))
+        p.start()
+        jobs[p.pid] = p
+    while num != 0:
+        event = control_queue.get()    ### block read
+        #p = jobs.pop(event['pid'])
+        p = jobs[event['pid']]
+        #p.join(1)
+        #os.kill(p.pid, signal.SIGKILL)
+        logging.info('main: %d wait child: %d exited done', os.getpid(), p.pid)
+        num -= 1 
+    logging.info("main: %d save tasks info", os.getpid())
+    save_tasks_info(share_queue)
+    logging.info("main: %d save tasks done", os.getpid())
+    for job in jobs:
+        os.kill(job, signal.SIGKILL)
+    logging.info('main: %d kill all jobs done', os.getpid()) 
+    logging.info('------work is done------')
+    logging.shutdown()

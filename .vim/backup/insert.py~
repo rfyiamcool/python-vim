@@ -1,0 +1,141 @@
+#encoding=utf-8
+#!/bin/python
+
+import os
+import sys
+import time
+import datetime
+import codecs
+import collections
+import logging  
+import signal
+
+logging.basicConfig(filename = os.path.join(os.getcwd(), 'insert.log'),\
+    level = logging.INFO, filemode = 'a', format = '%(asctime)s - %(process)s - %(levelname)s:\
+    %(message)s') 
+
+from pyes import ES 
+from store import SQLStore 
+from compress import decompress
+
+mysql_addr = {
+    'host' : '192.168.1.20',
+    'port' : 3306,
+    'user' : 'buzz',
+    'passwd' : 'f0b5e7',
+    'db' : 'buzz_master'
+    }
+sqlstore = SQLStore(**mysql_addr)
+
+#conn = ES('192.168.1.79:9200')
+#conn = ES('192.168.1.95:8200')
+conn = ES('192.168.1.88:9000')
+
+def get_index_name(idate):
+    index_name = 'listening_v2_' + str(idate.year) + str(idate.month)
+    return index_name
+
+def write_es(new_record):
+    try:
+        index_name = get_index_name(new_record['idate'])
+        conn.index(new_record, index_name, 'buzz', new_record['id'], bulk = False)
+        conn.refresh()
+    except Exception, e:
+        logging.error('error: %s, type: %s',str(e), str(type(e)))
+        ### logging error tasks in current batch
+    pass
+
+def read_mysql(id):
+    table_name = "article"
+    sql = "select category_id, channel_name, url, title, author,\
+        comment_count, view_count, industry_id, created_on, url_md5, page_type, id\
+        from %s " % table_name + """ where id = %s """
+    cursor = sqlstore.get_cursor()
+    cursor.execute(sql, (id, ))
+    
+    for article in cursor.fetchall():
+        ### step 1, get article and content 
+        article = list(article)
+        if len(article) != 12 :
+            continue
+        category_id = article[0]
+        channel_name = article[1] 
+        url = article[2]
+        title = article[3]
+        author = article[4]
+        comment_count = article[5]
+        view_count = article[6]
+        industry_id = article[7] 
+        created_on = article[8]
+        url_md5 = article[9]
+        page_type = article[10]
+        aid = article[11]   ### article_id
+        #print category_id, channel_name, url, title, author, comment_count, view_count, industry_id, created_on, url_md5, page_type
+        table_name = "article_content"
+        sql = "select content from %s " % table_name + """ where article_id = %s """
+        cursor.execute(sql, (aid, ))
+        article_content = cursor.fetchone()
+        if article_content is None:
+            continue
+        content, = article_content
+        content = title + unicode(decompress(content), 'utf-8')
+        
+        # build one new record
+        new_record = {}
+        new_record['id'] = u'buzz' + str(aid).decode('utf-8')
+        if category_id == 1 or category_id == 2 or category_id == 3:
+            category_id += 1     ### news, blog, bbs
+        elif category_id == 7:   ### weixin
+            category_id = 5
+        elif category_id == 5:   ### wenda
+            category_id = 6
+        else:
+            category_id = 2
+        new_record['platform'] = category_id
+        new_record['source'] = {'url': url, 'name': channel_name}
+        new_record['url'] = url
+        new_record['title'] = title
+        new_record['user'] = {'screen_name': author}
+        new_record['ccount'] = comment_count
+        new_record['flash'] = view_count
+        new_record['idate'] = created_on
+        new_record['text'] = content
+        
+        new_record['keyword'] = []   ### list
+        new_record['brief'] = []  ### list of dicts
+        new_record['distr_pan'] = [] ### list of dicts
+        
+        ### step 2, get all keywords info for this article 
+        table_name = "article_matched_keywords"
+        sql = "select article_id, pub_date, keyword, emotion, brief from %s " % table_name + \
+                """ where article_id = %s and status=0 order by pub_date; """
+        cursor.execute(sql, (aid, ))
+        for line in cursor.fetchall():
+            line = list(line)
+            if len(line) != 5:
+                logging.error('db error')
+                continue
+            article_id = line[0]
+            pub_date = line[1]
+            keyword = line[2]
+            emotion = line[3]
+            brief = line[4]
+            #print article_id, keyword, emotion, pub_date 
+            new_record['cdate'] = pub_date   ### overwrite
+            new_record['keyword'].append(keyword)
+            new_record['brief'].append({'k': keyword, 'v': brief})
+            new_record['distr_pan'].append({'k': keyword, 'v': emotion})
+        print new_record
+        write_es(new_record)
+        keys = ''
+        for k in new_record['keyword']:
+            keys += ' ' 
+            keys += k
+        logging.info('writing one new_record to es done, %s, %s', new_record['id'], keys)
+    cursor.connection.commit() 
+    cursor.close() 
+    pass
+
+if __name__ == '__main__':
+    id = sys.argv[1]
+    read_mysql(id)

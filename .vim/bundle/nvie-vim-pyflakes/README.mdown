@@ -1,0 +1,20 @@
+Installation
+------------
+1. Install [pyflakes](http://pypi.python.org/pypi/pyflakes/)
+2. Copy the file `ftplugin/python_pyflakes.vim` to your `~/.vim/ftplugin` directory
+
+Usage
+-----
+1. Open a Python file
+2. Press `<F7>` to run `pyflakes` on it
+
+It shows the errors inside a quickfix window, which will allow your to quickly
+jump to the error locations by simply pressing [Enter].
+
+Customization
+-------------
+If you don't want to use the `<F7>` key for pyflakes-checking, simply remap it to
+another key.  It autodetects whether it has been remapped and won't register
+the `<F7>` key if so.  For example, to remap it to `<F3>` instead, use:
+
+    autocmd FileType python map <buffer> <F3> :call Pyflakes()<CR>

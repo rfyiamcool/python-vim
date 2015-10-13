@@ -1,0 +1,14 @@
+[user]
+	name = wowuwowuwo
+	email = zuiwanting@gmail.com
+[alias]
+	st = status
+	ci = commit
+	co = checkout
+	br = branch
+	lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+[color]
+	status = auto
+	diff = auto
+	branch = auto
+	interactive = auto

@@ -1,0 +1,11 @@
+set -g prefix C-a
+unbind C-b
+#up
+bind-key k select-pane -U
+#down
+bind-key j select-pane -D
+#left
+bind-key h select-pane -L
+#right
+bind-key l select-pane -R
+setw -g mode-keys vi

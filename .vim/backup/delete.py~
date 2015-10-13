@@ -1,0 +1,28 @@
+#encoding=utf-8
+#!/bin/python
+
+import os
+import sys
+import time
+import datetime
+import codecs
+import collections
+import logging  
+import signal
+
+from pyes import * 
+
+#conn = ES('192.168.1.79:9200')
+conn = ES('192.168.1.88:9000')
+
+def get_index_name(idate):
+    index_name = 'listening_v1_' + str(idate.year) + str(idate.month)
+    return index_name
+
+def query(id):
+    q = TermQuery('id', id)
+    rs = conn.delete_by_query('listening', 'buzz', query = q)
+    conn.refresh()
+if __name__ == '__main__':
+    id = 'buzz' + str(sys.argv[1])
+    query(id)

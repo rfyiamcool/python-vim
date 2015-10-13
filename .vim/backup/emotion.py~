@@ -1,0 +1,25 @@
+#coding=utf-8
+
+import json
+import requests
+
+from buzz.lib.config import Config
+from buzz.lib.nlp.arc_nlp.sentiment.machines import SentiSegment
+
+cfg = Config()
+emotion_address = cfg.get('emotion', 'main')
+
+sentiSegmenter = SentiSegment()
+
+def get_emotion(text, keyword):
+    #headers = {'Content-Type': 'application/json'}
+    #r = requests.post(emotion_address, data=json.dumps({'text': text, 'target': keyword}), headers=headers)
+    #emotion = r.json().get("Result") or 0.0
+    emotion = sentiSegmenter.proc_sentiment(text, keyword)
+
+    if emotion == 0.0: #TODO: is this compare way correct?
+        return 0
+    elif emotion > 0.0:
+        return 1
+    else:
+        return -1
