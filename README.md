@@ -1,5 +1,9 @@
 # python-vim
 
+这是我自己精简后的python vim开发包环境。实还有更加丰富的功能，但那只会让vim速度变得很慢。  所以我要说的是，并不是插件越多越好，而是越精简越好，把不用的插件都在.vimrc中注释掉。 
+
+更多的介绍，[http://xiaorui.cc/2015/10/13/%E5%BF%AB%E9%80%9F%E6%89%93%E9%80%A0python-vim%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83powerlinectags/](http://xiaorui.cc/2015/10/13/%E5%BF%AB%E9%80%9F%E6%89%93%E9%80%A0python-vim%E5%BC%80%E5%8F%91%E7%8E%AF%E5%A2%83powerlinectags/)
+
 python vim环境包的安装方法:
 
 更新vim相关插件，是为了解决一些不兼容的问题。
