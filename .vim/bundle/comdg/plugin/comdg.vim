@@ -443,77 +443,17 @@ function! <SID>GetVer()
 endfunction
 
 function! <SID>GetEmail()
-  return "zuiwanting@gmail.com"
+  return "rfyiamcool@163.com"
 endfunction
 
 function! <SID>GetDoxFileHeader(leading_blank)
 
 	let doc = ""
-  let doc = doc. a:leading_blank."/***************************************************************************\n"
-	let doc = doc. a:leading_blank." *\n"
-  let doc = doc. a:leading_blank." * Copyright (c) ".<SID>GetYear()." Baidu.com, Inc. All Rights Reserved\n"
-  let doc = doc. a:leading_blank." * \$Id\$\n"
-  let doc = doc. a:leading_blank." *\n"
-  let doc = doc. a:leading_blank." **************************************************************************/\n"
-  let doc = doc. a:leading_blank." \n \n \n"
-  let doc = doc. a:leading_blank."/**\n"
-	let doc = doc. a:leading_blank." * @file ".<SID>GetFileName()."\n"
-	let doc = doc. a:leading_blank." * @author ".<SID>GetUserName()."(".<SID>GetEmail().")\n"
-	let doc = doc. a:leading_blank." * @date ".<SID>GetDate()."\n"
-	let doc = doc. a:leading_blank." * @version \$Revision\$\n"
-	let doc = doc. a:leading_blank." * @brief\n"
-	let doc = doc. a:leading_blank." *\n"
-	let doc = doc. a:leading_blank." **/\n"
-  call append(line('$'), "/* vim: set ts=4 sw=4 sts=4 tw=100 noet: */")
-	return doc
-
-
-endfunction
-
-function! <SID>GetDoxMainpage(leading_blank)
-
-	let doc = ""
-	let doc = doc.a:leading_blank."/**\n"
-	let doc = doc.a:leading_blank."* @mainpage xxx???????¡Â??? \n"
-	let doc = doc.a:leading_blank."* \<h2>????</h2>\n"
-	let doc = doc.a:leading_blank."* <p>xxxxxxxxxxx</p>\n"
-	let doc = doc.a:leading_blank."* <ol></ol>\n"
-	let doc = doc.a:leading_blank."* <h2>??¡Â???</h2>\n"
-	let doc = doc.a:leading_blank."* <hr>\n"
-	let doc = doc.a:leading_blank."* <p>????????<a href=\"mailto:".<SID>GetEmail()."?subject=[dilib]\">.".<SID>GetEmail()."</a></p>\n"
-	let doc = doc. a:leading_blank."*/\n"
-	return doc
-endfunction
-
-function! <SID>GetDoxClass(leading_blank)
-	let doc = ""
-	let doc = doc.a:leading_blank."/**\n"
-	let doc = doc. a:leading_blank."* @brief short description\n"
-	let doc = doc. a:leading_blank."*   detail description\n"
-	let doc = doc. a:leading_blank."*  \n"
-	let doc = doc. a:leading_blank."*/\n"
-	return doc
-endfunction
-function! <SID>GetDoxGroup(leading_blank)
-	let doc = ""
-	let doc = doc.a:leading_blank."/** @addtogroup groupname\n"
-	let doc = doc. a:leading_blank."*  \n"
-	let doc = doc. a:leading_blank."* <ul>\n"
-	let doc = doc. a:leading_blank."* <li> item1\n"
-	let doc = doc. a:leading_blank."* 	<ol>\n"
-	let doc = doc. a:leading_blank."* 	<li> subitem11\n"
-	let doc = doc. a:leading_blank."* 	<li> subitem12\n"
-	let doc = doc. a:leading_blank."* 	</ol>\n"
-	let doc = doc. a:leading_blank."* <li> item2\n"
-	let doc = doc. a:leading_blank."* 	<ol>\n"
-	let doc = doc. a:leading_blank."* 	<li> subitem21\n"
-	let doc = doc. a:leading_blank."* 	<li> subitem22\n"
-	let doc = doc. a:leading_blank."* 	</ol>\n"
-	let doc = doc. a:leading_blank."* </ul>\n"
-	let doc = doc. a:leading_blank."* @{\n"
-	let doc = doc. a:leading_blank."*/\n"
-	let doc = doc. a:leading_blank." \n"
-	let doc = doc. a:leading_blank."/** @} */\n"
+	let doc = doc. a:leading_blank."# @file ".<SID>GetFileName()."\n"
+	let doc = doc. a:leading_blank."# @author ".<SID>GetUserName()."(".<SID>GetEmail().")\n"
+	let doc = doc. a:leading_blank."# @date ".<SID>GetDate()."\n"
+	let doc = doc. a:leading_blank."# @version \$Revision\$\n"
+	let doc = doc. a:leading_blank."# @brief"
 	return doc
 endfunction
 
