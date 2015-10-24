@@ -8,13 +8,20 @@
 
 python vim环境包的安装方法:
 
-更新vim相关插件，是为了解决一些不兼容的问题。
+记得一定要更新vim相关插件，是为了解决一些不兼容的问题。
 
 ```
 sudo yum clean all
 sudo yum -y update vim
 sudo yum -y install epel-release
 sudo yum -y install ctags
+```
+
+如果你是Ubuntu系统
+
+```
+apt-get update vim
+apt-get install ctags
 ```
 
 下载我这边打包好的 .vimrc .vim .bashrc   , 含有一些常用的插件,主题 , 组件。
@@ -47,6 +54,11 @@ sudo pip install powerline-status
 下面是shell的提示状态，如果不想让shell有炫目的powerline主题，那么就不用执行下面的命令。 
 ``` 
 . /usr/local/lib/python2.7/site-packages/powerline/bindings/bash/powerline.sh
+```
+
+如果你是Ubuntu系统，那么需要更改下python模块路径.
+```
+. /usr/local/lib/python2.7/dist-packages/powerline/bindings/bash/powerline.sh
 ```
 
 
