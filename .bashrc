@@ -34,8 +34,9 @@ __mikespook_ps1() {
     echo "${cyan}[$u@$h]\$(__git_ps1 '[$red%s${none}]')${uc}${p}${none}${cyan}"
 }
 
-
-
+#git-prompt.sh PS1
+#source ~/.git-prompt.sh
+#PS1='[\u@\h \W$(__git_ps1 " (%s)")]\$'
 
 export PS1=$(__mikespook_ps1)
 
